@@ -1,0 +1,2164 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cashew Drone Planner — Công cụ lập kế hoạch bay drone RGB + Thermal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0e12;
+  --bg-2: #10161c;
+  --bg-3: #1a2229;
+  --grid: rgba(120, 180, 200, 0.06);
+  --text: #e8ecef;
+  --text-dim: #8a99a4;
+  --text-faint: #4a5761;
+  --accent: #4ecdc4;        /* teal — drone color */
+  --accent-2: #f5a623;       /* amber — thermal */
+  --good: #7ed957;
+  --warn: #f5a623;
+  --bad: #ef476f;
+  --tree: #5a8a3a;
+  --thermal-hot: #ef476f;
+  --thermal-warm: #f5a623;
+  --thermal-cool: #4ecdc4;
+  --border: rgba(120, 180, 200, 0.15);
+  --border-strong: rgba(120, 180, 200, 0.3);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+    radial-gradient(ellipse at 50% 0%, rgba(78, 205, 196, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.header {
+  position: relative;
+  z-index: 10;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(10,14,18,0.95) 0%, rgba(10,14,18,0.8) 100%);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.brand {
+  font-family: 'Fraunces', serif;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.brand span { color: var(--accent); font-style: italic; }
+
+.meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  min-height: calc(100vh - 76px);
+}
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.sidebar {
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  padding: 24px;
+  overflow-y: auto;
+  max-height: calc(100vh - 76px);
+  position: sticky;
+  top: 0;
+}
+@media (max-width: 1100px) {
+  .sidebar { position: static; max-height: none; }
+}
+
+.section { margin-bottom: 28px; }
+
+.section-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px dashed var(--border-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 50%;
+}
+
+.field { margin-bottom: 14px; }
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.field label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.field label .unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.field input[type="number"],
+.field select {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+}
+.field input[type="number"]:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
+}
+.field input[type="range"] {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-3);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+.field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg-2);
+}
+.field input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid var(--bg-2);
+}
+
+.slider-wrap { display: flex; align-items: center; gap: 10px; }
+.slider-wrap input[type="range"] { flex: 1; }
+.slider-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  min-width: 56px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  background: var(--bg-3);
+  padding: 3px;
+  border-radius: 3px;
+}
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 8px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+.mode-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.sensor-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-3);
+  padding: 3px;
+  border-radius: 3px;
+  margin-bottom: 14px;
+}
+.sensor-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  padding: 8px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+.sensor-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.main {
+  padding: 24px 32px 48px;
+  overflow-x: hidden;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.kpi {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
+}
+.kpi.good::before { background: var(--good); }
+.kpi.warn::before { background: var(--warn); }
+.kpi.bad::before { background: var(--bad); }
+
+.kpi-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.kpi-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-left: 4px;
+  font-weight: 400;
+}
+.kpi-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.panel {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(26, 34, 41, 0.8), rgba(16, 22, 28, 0.4));
+}
+.panel-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.panel-title .marker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(78, 205, 196, 0.1);
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+.panel-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.panel-body { padding: 0; position: relative; }
+canvas { display: block; width: 100%; background: var(--bg); }
+
+.legend {
+  display: flex;
+  gap: 18px;
+  padding: 10px 18px;
+  background: var(--bg-3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 12px; height: 12px; border-radius: 2px; }
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+.data-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--border-strong);
+}
+.data-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table tbody tr:hover { background: rgba(78, 205, 196, 0.03); }
+.data-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table .chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.chip.good { background: rgba(126, 217, 87, 0.15); color: var(--good); }
+.chip.warn { background: rgba(245, 166, 35, 0.15); color: var(--warn); }
+.chip.bad  { background: rgba(239, 71, 111, 0.15); color: var(--bad); }
+
+.recommendation {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.08), rgba(245, 166, 35, 0.04));
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-left: 3px solid var(--accent);
+  padding: 18px 22px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+.recommendation h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.recommendation p {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.rec-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.rec-item b { color: var(--text); font-weight: 600; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.action-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s;
+}
+.action-btn:hover { border-color: var(--accent); color: var(--accent); }
+.action-btn.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.formula {
+  background: var(--bg-3);
+  border-left: 2px solid var(--accent-2);
+  padding: 12px 16px;
+  margin: 10px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text);
+  border-radius: 0 3px 3px 0;
+}
+.formula b { color: var(--accent-2); }
+.formula .comment { color: var(--text-dim); font-style: italic; }
+
+.info-note {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* Edge case warning styles */
+.warning-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  padding: 14px 18px;
+}
+.warning-card {
+  background: var(--bg-3);
+  border-left: 3px solid var(--warn);
+  padding: 10px 14px;
+  border-radius: 0 3px 3px 0;
+  font-size: 12px;
+}
+.warning-card.bad { border-left-color: var(--bad); }
+.warning-card.good { border-left-color: var(--good); }
+.warning-card-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+  color: var(--warn);
+}
+.warning-card.bad .warning-card-title { color: var(--bad); }
+.warning-card.good .warning-card-title { color: var(--good); }
+.warning-card-desc { color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+
+/* Season calendar */
+.season-calendar {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+  padding: 14px 18px;
+}
+.month {
+  background: var(--bg-3);
+  padding: 10px 6px;
+  text-align: center;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  position: relative;
+  border: 1px solid var(--border);
+}
+.month-name {
+  color: var(--text-dim);
+  font-size: 10px;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.month-status {
+  font-size: 16px;
+  margin-top: 2px;
+}
+.month.ok { border-color: rgba(126, 217, 87, 0.3); background: rgba(126, 217, 87, 0.05); }
+.month.caution { border-color: rgba(245, 166, 35, 0.3); background: rgba(245, 166, 35, 0.05); }
+.month.avoid { border-color: rgba(239, 71, 111, 0.3); background: rgba(239, 71, 111, 0.05); }
+.month-phase {
+  font-size: 8px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+/* Propwash visualization */
+.propwash-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 18px;
+}
+.propwash-card {
+  background: var(--bg-3);
+  padding: 12px 14px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.propwash-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  letter-spacing: 0.1em;
+}
+.propwash-card-value {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.1;
+}
+.propwash-card-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.footer {
+  padding: 24px 32px;
+  border-top: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: center;
+  line-height: 1.7;
+}
+
+.sidebar::-webkit-scrollbar { width: 6px; }
+.sidebar::-webkit-scrollbar-track { background: var(--bg-2); }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="brand">Cashew <span>Drone Planner</span></div>
+    <div class="meta" style="margin-top: 2px;">Lập kế hoạch bay · RGB + Thermal · Quản lý edge case · theo mùa</div>
+  </div>
+  <div class="meta">TVAN-CASHEW-2026 · Drone Tool · V1.0</div>
+</div>
+
+<div class="layout">
+
+  <!-- =================== SIDEBAR =================== -->
+  <aside class="sidebar">
+
+    <div class="section">
+      <div class="section-title">Drone · Platform</div>
+      <div class="field">
+        <label>Mẫu drone</label>
+        <select id="dronePreset">
+          <option value="m4t">DJI Matrice 4T (khuyến nghị)</option>
+          <option value="m3t">DJI Mavic 3T (ngân sách tiết kiệm)</option>
+          <option value="mavic4pro">DJI Mavic 4 Pro (chỉ RGB)</option>
+          <option value="custom">Tùy chỉnh</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Cảm biến đang dùng</label>
+        <div class="sensor-toggle">
+          <button class="sensor-btn active" data-sensor="rgb_wide">RGB 24mm</button>
+          <button class="sensor-btn" data-sensor="rgb_medium">RGB 70mm</button>
+          <button class="sensor-btn" data-sensor="rgb_tele">RGB 168mm</button>
+          <button class="sensor-btn" data-sensor="thermal">Thermal</button>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Pixel ngang <span class="unit">px</span></label>
+          <input type="number" id="sensorW" value="8064" min="320" max="16000" step="32">
+        </div>
+        <div class="field">
+          <label>Pixel dọc <span class="unit">px</span></label>
+          <input type="number" id="sensorH" value="6048" min="240" max="12000" step="32">
+        </div>
+      </div>
+      <div class="field">
+        <label>FOV ngang <span class="unit">°</span></label>
+        <input type="number" id="fovH" value="82" min="5" max="120" step="0.5">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Vườn · Orchard</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Dài vườn <span class="unit">m</span></label>
+          <input type="number" id="fieldL" value="200" min="20" max="2000" step="10">
+        </div>
+        <div class="field">
+          <label>Rộng vườn <span class="unit">m</span></label>
+          <input type="number" id="fieldW" value="100" min="20" max="1000" step="10">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Hàng × Cây <span class="unit">m</span></label>
+          <input type="number" id="rowSp" value="10" min="3" max="20" step="0.5">
+        </div>
+        <div class="field">
+          <label>Cây cách <span class="unit">m</span></label>
+          <input type="number" id="colSp" value="5" min="3" max="20" step="0.5">
+        </div>
+      </div>
+      <div class="field">
+        <label>Cao cây trung bình <span class="unit">m</span></label>
+        <input type="number" id="treeH" value="7" min="2" max="20" step="0.5">
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Bay · Flight parameters</div>
+
+      <div class="field">
+        <label>Độ cao bay AGL <span class="unit" id="altUnit">20 m</span></label>
+        <div class="slider-wrap">
+          <input type="range" id="altAGL" min="5" max="60" step="0.5" value="20">
+          <div class="slider-value"><span id="altVal">20</span>m</div>
+        </div>
+        <div class="info-note">AGL = Above Ground Level (trên mặt đất). Above canopy = AGL − tree_height</div>
+      </div>
+
+      <div class="field">
+        <label>Tốc độ bay <span class="unit" id="speedUnit">3 m/s</span></label>
+        <div class="slider-wrap">
+          <input type="range" id="speed" min="0.5" max="10" step="0.5" value="3">
+          <div class="slider-value"><span id="speedVal">3</span>m/s</div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Overlap bên <span class="unit">%</span></label>
+          <input type="number" id="overlapSide" value="60" min="30" max="90" step="5">
+        </div>
+        <div class="field">
+          <label>Overlap trước <span class="unit">%</span></label>
+          <input type="number" id="overlapFwd" value="70" min="30" max="90" step="5">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Chế độ bay</label>
+        <div class="mode-toggle">
+          <button class="mode-btn active" data-mode="continuous">Continuous</button>
+          <button class="mode-btn" data-mode="hover">Hover & Capture</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Mục tiêu · Target detection</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Kích thước mục tiêu <span class="unit">mm</span></label>
+          <input type="number" id="targetSize" value="2" min="0.5" max="500" step="0.5">
+        </div>
+        <div class="field">
+          <label>Pixel tối thiểu <span class="unit">px</span></label>
+          <input type="number" id="minPx" value="4" min="2" max="20" step="1">
+        </div>
+      </div>
+      <div class="info-note">
+        Chấm bọ xít: 2mm · Vết thán thư nhỏ: 5mm · Vết lớn: 15mm<br>
+        Thermal hotspot: 50mm (5cm) · Vùng bệnh: 300mm
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Môi trường · Environment</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Tháng bay <span class="unit"></span></label>
+          <select id="month">
+            <option value="1">1 (ra hoa)</option>
+            <option value="2">2 (quả non)</option>
+            <option value="3">3 (quả non)</option>
+            <option value="4" selected>4 (quả lớn)</option>
+            <option value="5">5 (quả chín)</option>
+            <option value="6">6 (mùa mưa)</option>
+            <option value="7">7 (mùa mưa)</option>
+            <option value="8">8 (mùa mưa)</option>
+            <option value="9">9 (mùa mưa)</option>
+            <option value="10">10 (mùa mưa)</option>
+            <option value="11">11 (ra hoa)</option>
+            <option value="12">12 (ra hoa)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Giờ bay <span class="unit"></span></label>
+          <select id="hour">
+            <option value="6">6:00</option>
+            <option value="7" selected>7:00</option>
+            <option value="8">8:00</option>
+            <option value="9">9:00</option>
+            <option value="10">10:00</option>
+            <option value="11">11:00</option>
+            <option value="12">12:00</option>
+            <option value="13">13:00</option>
+            <option value="14">14:00</option>
+            <option value="15">15:00</option>
+            <option value="16">16:00</option>
+            <option value="17">17:00</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Tốc độ gió <span class="unit" id="windUnit">3 m/s</span></label>
+        <div class="slider-wrap">
+          <input type="range" id="wind" min="0" max="15" step="0.5" value="3">
+          <div class="slider-value"><span id="windVal">3</span>m/s</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Pin · Battery</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Flight time <span class="unit">phút</span></label>
+          <input type="number" id="batteryTime" value="49" min="15" max="90" step="1">
+        </div>
+        <div class="field">
+          <label>Số pin có <span class="unit"></span></label>
+          <input type="number" id="batteryCount" value="3" min="1" max="10" step="1">
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- =================== MAIN =================== -->
+  <main class="main">
+
+    <div class="actions">
+      <button class="action-btn primary" id="btnOptimize">⚡ Tối ưu tự động</button>
+      <button class="action-btn" id="btnExportJSON">💾 Xuất mission (JSON)</button>
+      <button class="action-btn" id="btnExportPNG">📷 Xuất PNG</button>
+      <button class="action-btn" id="btnPrint">🖨 In báo cáo</button>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="recommendation" id="recommendation"></div>
+
+    <!-- Edge cases warning -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">!! / CẢNH BÁO</span> Edge case tự động phát hiện</div>
+      </div>
+      <div class="panel-body">
+        <div class="warning-grid" id="warningGrid"></div>
+      </div>
+    </div>
+
+    <!-- Propwash analysis -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">01 / PROPWASH</span> Ảnh hưởng gió cánh quạt</div>
+        <div class="panel-hint">Cánh quạt drone tạo downwash ~15 m/s sát cánh, giảm dần theo 1/r²</div>
+      </div>
+      <div class="panel-body">
+        <canvas id="propwashCanvas" width="1200" height="400"></canvas>
+      </div>
+      <div class="propwash-info" id="propwashInfo"></div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(239,71,111,0.5)"></div>Vùng propwash nguy hiểm (&gt;5 m/s)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(245,166,35,0.5)"></div>Vùng propwash cảnh báo (3-5 m/s)</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(126,217,87,0.4)"></div>Vùng an toàn (&lt;3 m/s)</div>
+      </div>
+    </div>
+
+    <!-- Top-down flight path -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">02 / PATH</span> Quỹ đạo bay (top-down)</div>
+        <div class="panel-hint">Đường bay zigzag với khoảng cách tính theo overlap</div>
+      </div>
+      <div class="panel-body">
+        <canvas id="pathCanvas" width="1200" height="500"></canvas>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--tree)"></div>Cây điều</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent)"></div>Đường bay</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(78,205,196,0.2)"></div>Vùng phủ ảnh</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-2)"></div>Điểm chụp (hover mode)</div>
+      </div>
+    </div>
+
+    <!-- Side view: drone + tree + propwash -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">03 / SIDE</span> Mặt cắt bên · drone + cây + FOV + propwash</div>
+        <div class="panel-hint">Vùng màu cam là vùng propwash ảnh hưởng đến lá cây</div>
+      </div>
+      <div class="panel-body">
+        <canvas id="sideCanvas" width="1200" height="450"></canvas>
+      </div>
+    </div>
+
+    <!-- Seasonal calendar -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">04 / SEASON</span> Lịch bay theo mùa cây điều</div>
+        <div class="panel-hint">Đánh dấu tháng nào nên bay, tháng nào nên tránh</div>
+      </div>
+      <div class="panel-body">
+        <div class="season-calendar" id="seasonCal"></div>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(126,217,87,0.3); border:1px solid var(--good)"></div>OK — bay bình thường</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(245,166,35,0.3); border:1px solid var(--warn)"></div>THẬN TRỌNG — giới hạn</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(239,71,111,0.3); border:1px solid var(--bad)"></div>TRÁNH — hoa hoặc quả non</div>
+      </div>
+    </div>
+
+    <!-- GSD table -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">05 / GSD</span> Bảng GSD theo độ cao</div>
+        <div class="panel-hint">Xanh: rõ · Vàng: biên · Đỏ: không đủ</div>
+      </div>
+      <div class="panel-body">
+        <table class="data-table" id="gsdTable"></table>
+      </div>
+    </div>
+
+    <!-- Sensor comparison -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">06 / COMPARE</span> So sánh các cảm biến tại độ cao hiện tại</div>
+        <div class="panel-hint">Mỗi cảm biến có strengths khác nhau, bảng giúp chọn sensor phù hợp</div>
+      </div>
+      <div class="panel-body">
+        <table class="data-table" id="sensorTable"></table>
+      </div>
+    </div>
+
+    <!-- Formulas -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="marker">∑ / FORMULAS</span> Công thức đang áp dụng</div>
+      </div>
+      <div class="panel-body" style="padding: 18px;">
+        <div class="formula">
+          <b>Vùng phủ mặt đất:</b> W = 2 · h_above · tan(α/2) · &nbsp; H = W · (H_px / W_px)<br>
+          <span class="comment">h_above = AGL - tree_height (độ cao trên tán)</span>
+        </div>
+        <div class="formula">
+          <b>GSD:</b> GSD = W · 1000 / W_px &nbsp; [mm/pixel]<br>
+          <span class="comment">Số pixel cho mục tiêu = target_size / GSD</span>
+        </div>
+        <div class="formula">
+          <b>Khoảng cách đường bay:</b> S_line = W · (1 - overlap_side)<br>
+          <b>Khoảng cách điểm chụp:</b> S_trigger = H · (1 - overlap_forward)
+        </div>
+        <div class="formula">
+          <b>Tổng số ảnh:</b> N = ceil(field_W / S_line) × ceil(field_L / S_trigger)
+        </div>
+        <div class="formula">
+          <b>Quãng đường bay:</b> D = N_lines · field_L + (N_lines - 1) · S_line
+        </div>
+        <div class="formula">
+          <b>Thời gian bay:</b> T = D / v + N · t_capture + T_takeoff<br>
+          <span class="comment">Continuous: t_capture ≈ 0.3s · Hover: t_capture = 2-3s</span>
+        </div>
+        <div class="formula">
+          <b>Tốc độ tối đa (motion blur):</b> v_max = GSD · W_px / (1000 · t_exposure · k_blur)<br>
+          <span class="comment">t_exposure RGB ≈ 1/1000s · Thermal ≈ 1/30s → thermal bottleneck</span>
+        </div>
+        <div class="formula">
+          <b>Propwash velocity:</b> v_pw(h) = v_0 · (D_rotor / (D_rotor + 2·h))²<br>
+          <span class="comment">v_0 ≈ 15 m/s sát cánh · D_rotor ≈ 0.27m với Matrice 4</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="footer">
+  <b style="color:var(--text-dim)">Cashew Drone Planner</b> · Công cụ lập kế hoạch bay drone cho đề tài phát hiện bệnh cây điều<br>
+  Đi kèm tài liệu TVAN-CASHEW-2026-v1.0-ADD01 · Mọi số liệu cần xác nhận qua khảo sát thực địa · © 2026
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ============================================================
+// DRONE PRESETS
+// ============================================================
+const DRONES = {
+  m4t: {
+    name: 'DJI Matrice 4T',
+    sensors: {
+      rgb_wide:   { name: 'RGB Wide 24mm',   w: 8064, h: 6048, fov: 82, exp: 0.001 },
+      rgb_medium: { name: 'RGB 70mm',        w: 8064, h: 6048, fov: 35, exp: 0.001 },
+      rgb_tele:   { name: 'RGB Tele 168mm',  w: 8192, h: 6144, fov: 15, exp: 0.001 },
+      thermal:    { name: 'Thermal UHR',     w: 1280, h: 1024, fov: 35, exp: 0.033 }
+    },
+    flightTime: 49,
+    rotorD: 0.27
+  },
+  m3t: {
+    name: 'DJI Mavic 3T',
+    sensors: {
+      rgb_wide:   { name: 'RGB Wide',        w: 4000, h: 3000, fov: 84, exp: 0.001 },
+      rgb_medium: { name: 'RGB (n/a)',       w: 4000, h: 3000, fov: 84, exp: 0.001 },
+      rgb_tele:   { name: 'RGB Tele',        w: 8000, h: 6000, fov: 15, exp: 0.001 },
+      thermal:    { name: 'Thermal 640',     w: 640,  h: 512,  fov: 45, exp: 0.033 }
+    },
+    flightTime: 45,
+    rotorD: 0.27
+  },
+  mavic4pro: {
+    name: 'DJI Mavic 4 Pro',
+    sensors: {
+      rgb_wide:   { name: 'Hasselblad 28mm', w: 8064, h: 6048, fov: 72, exp: 0.001 },
+      rgb_medium: { name: 'Tele 70mm',       w: 5280, h: 3956, fov: 35, exp: 0.001 },
+      rgb_tele:   { name: 'Tele 168mm',      w: 5280, h: 3956, fov: 15, exp: 0.001 },
+      thermal:    { name: 'N/A (no thermal)', w: 0,   h: 0,    fov: 0,  exp: 0 }
+    },
+    flightTime: 51,
+    rotorD: 0.23
+  }
+};
+
+const state = {
+  drone: 'm4t',
+  sensor: 'rgb_wide',
+  field: { l: 200, w: 100 },
+  spacing: { row: 10, col: 5 },
+  tree: { h: 7 },
+  flight: {
+    aglHeight: 20,
+    speed: 3,
+    overlapSide: 0.6,
+    overlapFwd: 0.7,
+    mode: 'continuous'
+  },
+  target: { size: 2, minPx: 4 },
+  env: { month: 4, hour: 7, wind: 3 },
+  battery: { time: 49, count: 3 }
+};
+
+// ============================================================
+// MATH
+// ============================================================
+const deg2rad = d => d * Math.PI / 180;
+const rad2deg = r => r * 180 / Math.PI;
+
+function coverageWidth(h_above, fov) {
+  return 2 * h_above * Math.tan(deg2rad(fov) / 2);
+}
+function gsd(h_above, fov, px) {
+  return coverageWidth(h_above, fov) * 1000 / px;
+}
+// Max altitude above canopy to achieve target GSD
+function maxAlt(gsdTarget, fov, px) {
+  return (gsdTarget * px) / (2000 * Math.tan(deg2rad(fov) / 2));
+}
+
+// Propwash velocity at distance h below rotor (momentum theory simplified)
+function propwashVel(h, rotorD = 0.27, v0 = 15) {
+  // v(h) = v0 * (D/(D+2h))^2  simplified
+  return v0 * Math.pow(rotorD / (rotorD + 2 * h), 2);
+}
+
+// Season logic: map month to bay phase
+function monthPhase(m) {
+  // Cashew phenology in Bình Phước (tropical):
+  // T11-T1: ra hoa (flowering) — AVOID drone
+  // T2-T3: quả non (young fruit) — CAUTION, bay cao
+  // T4-T5: quả lớn (fruit maturation) — OK
+  // T6-T10: mùa mưa + cây nghỉ — OK but weather issue
+  if (m === 11 || m === 12 || m === 1) return { phase: 'Ra hoa', status: 'avoid', emoji: '🚫' };
+  if (m === 2 || m === 3) return { phase: 'Quả non', status: 'caution', emoji: '⚠' };
+  if (m === 4 || m === 5) return { phase: 'Quả lớn', status: 'ok', emoji: '✓' };
+  if (m >= 6 && m <= 10) return { phase: 'Mùa mưa', status: 'caution', emoji: '⚠' };
+  return { phase: '?', status: 'caution', emoji: '?' };
+}
+
+// Hour to time-of-day quality
+function hourQuality(h) {
+  // Early morning 6-8: thermal contrast highest, OK for thermal
+  // 8-10: good for RGB, thermal degrading
+  // 10-14: AVOID (high sun, shadows hard, thermal equalized)
+  // 14-16: RGB OK, thermal returning
+  // 16-18: golden hour, good RGB
+  if (h >= 6 && h < 8)   return { quality: 'thermal_best', label: 'Thermal tốt nhất' };
+  if (h >= 8 && h < 10)  return { quality: 'good', label: 'Tốt cho RGB' };
+  if (h >= 10 && h < 15) return { quality: 'avoid', label: 'TRÁNH (nắng gắt, bóng đổ)' };
+  if (h >= 15 && h < 17) return { quality: 'good', label: 'Tốt (golden hour)' };
+  return { quality: 'avoid', label: 'TRÁNH (tối/sương)' };
+}
+
+// ============================================================
+// READ INPUTS
+// ============================================================
+function readInputs() {
+  state.drone = $('dronePreset').value;
+  state.field.l = +$('fieldL').value;
+  state.field.w = +$('fieldW').value;
+  state.spacing.row = +$('rowSp').value;
+  state.spacing.col = +$('colSp').value;
+  state.tree.h = +$('treeH').value;
+  state.flight.aglHeight = +$('altAGL').value;
+  state.flight.speed = +$('speed').value;
+  state.flight.overlapSide = +$('overlapSide').value / 100;
+  state.flight.overlapFwd = +$('overlapFwd').value / 100;
+  state.target.size = +$('targetSize').value;
+  state.target.minPx = +$('minPx').value;
+  state.env.month = +$('month').value;
+  state.env.hour = +$('hour').value;
+  state.env.wind = +$('wind').value;
+  state.battery.time = +$('batteryTime').value;
+  state.battery.count = +$('batteryCount').value;
+
+  // Update drone params if preset changed
+  const d = DRONES[state.drone];
+  if (d && d.sensors[state.sensor]) {
+    const s = d.sensors[state.sensor];
+    $('sensorW').value = s.w;
+    $('sensorH').value = s.h;
+    $('fovH').value = s.fov;
+    $('batteryTime').value = d.flightTime;
+    state.battery.time = d.flightTime;
+  }
+}
+
+// ============================================================
+// COMPUTE
+// ============================================================
+function compute() {
+  const sensorW = +$('sensorW').value;
+  const sensorH = +$('sensorH').value;
+  const fov = +$('fovH').value;
+  const h_above = Math.max(0.1, state.flight.aglHeight - state.tree.h);
+
+  const W = coverageWidth(h_above, fov);
+  const H = W * sensorH / sensorW;
+  const GSD = gsd(h_above, fov, sensorW);
+  const pxForTarget = state.target.size / GSD;
+  const meetsTarget = pxForTarget >= state.target.minPx;
+
+  const S_line = W * (1 - state.flight.overlapSide);
+  const S_trigger = H * (1 - state.flight.overlapFwd);
+
+  const N_lines = Math.ceil(state.field.w / S_line) + 1;
+  const N_per_line = Math.ceil(state.field.l / S_trigger) + 1;
+  const N_total = N_lines * N_per_line;
+
+  const D = N_lines * state.field.l + (N_lines - 1) * S_line;
+  const tCapture = state.flight.mode === 'hover' ? 2.5 : 0.3;
+  const T_flight_sec = D / state.flight.speed + N_total * tCapture + 60; // +60s for takeoff/landing
+  const T_flight_min = T_flight_sec / 60;
+
+  // Adjust for wind and temperature impact on battery
+  let batteryDerating = 1.0;
+  if (state.env.wind > 7) batteryDerating *= 0.85;
+  if (state.env.hour >= 11 && state.env.hour <= 14) batteryDerating *= 0.85; // heat
+  const effectiveBatteryTime = state.battery.time * batteryDerating;
+
+  const batteriesNeeded = Math.ceil(T_flight_min / effectiveBatteryTime);
+
+  // Propwash at canopy
+  const propwashAtCanopy = propwashVel(h_above, DRONES[state.drone]?.rotorD || 0.27);
+
+  // Motion blur max speed
+  const sensorData = DRONES[state.drone]?.sensors[state.sensor];
+  const exposure = sensorData?.exp || 0.001;
+  const vMaxBlur = GSD * sensorW / (1000 * exposure);
+
+  return {
+    W, H, GSD, pxForTarget, meetsTarget,
+    S_line, S_trigger, N_lines, N_per_line, N_total,
+    D, T_flight_min,
+    effectiveBatteryTime, batteriesNeeded,
+    propwashAtCanopy,
+    h_above,
+    vMaxBlur,
+    sensorW, sensorH, fov
+  };
+}
+
+// ============================================================
+// UPDATE KPIs
+// ============================================================
+function updateKPIs(r) {
+  const fieldArea = state.field.l * state.field.w;
+  const phase = monthPhase(state.env.month);
+  const hourQ = hourQuality(state.env.hour);
+
+  const kpis = [
+    {
+      label: 'GSD HIỆN TẠI',
+      value: r.GSD.toFixed(2),
+      unit: 'mm/px',
+      sub: `${r.pxForTarget.toFixed(1)} px cho mục tiêu ${state.target.size}mm`,
+      cls: r.meetsTarget ? 'good' : 'bad'
+    },
+    {
+      label: 'VÙNG PHỦ 1 ẢNH',
+      value: (r.W * r.H).toFixed(0),
+      unit: 'm²',
+      sub: `${r.W.toFixed(1)} × ${r.H.toFixed(1)} m`,
+      cls: ''
+    },
+    {
+      label: 'TỔNG ẢNH',
+      value: r.N_total,
+      unit: '',
+      sub: `${r.N_lines} lines × ${r.N_per_line}/line`,
+      cls: r.N_total > 3000 ? 'warn' : ''
+    },
+    {
+      label: 'THỜI GIAN BAY',
+      value: r.T_flight_min.toFixed(1),
+      unit: 'phút',
+      sub: `${(r.D/1000).toFixed(2)} km quãng đường`,
+      cls: r.T_flight_min > r.effectiveBatteryTime ? 'bad' : (r.T_flight_min > r.effectiveBatteryTime * 0.8 ? 'warn' : 'good')
+    },
+    {
+      label: 'PIN CẦN',
+      value: r.batteriesNeeded,
+      unit: `/ ${state.battery.count}`,
+      sub: `Battery effective: ${r.effectiveBatteryTime.toFixed(0)} phút`,
+      cls: r.batteriesNeeded > state.battery.count ? 'bad' : (r.batteriesNeeded === state.battery.count ? 'warn' : 'good')
+    },
+    {
+      label: 'PROPWASH TẠI TÁN',
+      value: r.propwashAtCanopy.toFixed(1),
+      unit: 'm/s',
+      sub: r.propwashAtCanopy > 5 ? 'Rung lá mạnh' : (r.propwashAtCanopy > 3 ? 'Rung nhẹ' : 'An toàn'),
+      cls: r.propwashAtCanopy > 5 ? 'bad' : (r.propwashAtCanopy > 3 ? 'warn' : 'good')
+    },
+    {
+      label: 'V_MAX (BLUR)',
+      value: r.vMaxBlur.toFixed(1),
+      unit: 'm/s',
+      sub: state.flight.speed > r.vMaxBlur ? 'Bay chậm lại!' : 'OK',
+      cls: state.flight.speed > r.vMaxBlur ? 'bad' : 'good'
+    },
+    {
+      label: 'MÙA CÂY',
+      value: phase.emoji + ' ' + phase.phase,
+      unit: '',
+      sub: phase.status === 'avoid' ? 'KHÔNG BAY' : (phase.status === 'caution' ? 'Cẩn thận' : 'OK'),
+      cls: phase.status === 'avoid' ? 'bad' : (phase.status === 'caution' ? 'warn' : 'good')
+    }
+  ];
+
+  $('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}<span class="kpi-unit"> ${k.unit}</span></div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// EDGE CASE DETECTION
+// ============================================================
+function detectEdgeCases(r) {
+  const warnings = [];
+  const phase = monthPhase(state.env.month);
+  const hourQ = hourQuality(state.env.hour);
+
+  // A1-A4: Propwash
+  if (r.propwashAtCanopy > 5) {
+    warnings.push({
+      type: 'bad',
+      title: 'A1 · Lá rung mạnh do propwash',
+      desc: `Propwash ${r.propwashAtCanopy.toFixed(1)} m/s tại tán → ảnh nhòe, lá có thể rụng. Nâng độ cao lên ≥ ${Math.ceil(state.tree.h + 5)}m AGL.`
+    });
+  } else if (r.propwashAtCanopy > 3) {
+    warnings.push({
+      type: 'warn',
+      title: 'A1 · Lá có thể rung nhẹ',
+      desc: `Propwash ${r.propwashAtCanopy.toFixed(1)} m/s — chấp nhận được nhưng nên dùng shutter speed 1/2000s.`
+    });
+  }
+
+  // A4: Hoa/quả non rụng
+  if (phase.status === 'avoid') {
+    warnings.push({
+      type: 'bad',
+      title: 'A4 · Cấm bay trong mùa hoa/quả non',
+      desc: `Tháng ${state.env.month} là mùa ${phase.phase} — drone làm rụng hoa/quả non, ảnh hưởng năng suất. TẠM NGỪNG drone, chỉ dùng PTZ.`
+    });
+  }
+  if (phase.status === 'caution' && state.flight.aglHeight < 12) {
+    warnings.push({
+      type: 'warn',
+      title: 'A4 · Bay quá thấp trong mùa nhạy cảm',
+      desc: `Tháng ${state.env.month} (${phase.phase}) — nâng độ cao lên ≥ 12m AGL để giảm ảnh hưởng propwash lên quả non.`
+    });
+  }
+
+  // B1: Gió
+  if (state.env.wind > 10) {
+    warnings.push({
+      type: 'bad',
+      title: 'B1 · Gió quá mạnh',
+      desc: `Gió ${state.env.wind} m/s vượt giới hạn bay (10 m/s chất lượng, 12 m/s tuyệt đối). HỦY mission.`
+    });
+  } else if (state.env.wind > 7) {
+    warnings.push({
+      type: 'warn',
+      title: 'B1 · Gió mạnh ảnh hưởng chất lượng',
+      desc: `Gió ${state.env.wind} m/s → gimbal bù trừ liên tục, ảnh có thể nhòe. Cân nhắc hoãn đến khi gió < 7 m/s.`
+    });
+  }
+
+  // B2: Giờ bay
+  if (hourQ.quality === 'avoid') {
+    warnings.push({
+      type: 'warn',
+      title: 'B2 · Giờ bay không tối ưu',
+      desc: `${state.env.hour}:00 — ${hourQ.label}. Chênh nhiệt thấp cho thermal, bóng đổ cứng cho RGB. Nên bay 6-9h hoặc 15-17h.`
+    });
+  }
+  if (hourQ.quality === 'thermal_best' && state.sensor !== 'thermal') {
+    warnings.push({
+      type: 'good',
+      title: 'B2 · Giờ tốt cho thermal',
+      desc: `${state.env.hour}:00 là thời điểm tốt nhất cho thermal (chênh nhiệt cây/MT cao nhất). Cân nhắc chuyển sang sensor thermal.`
+    });
+  }
+
+  // Altitude safety
+  if (state.flight.aglHeight < state.tree.h + 2) {
+    warnings.push({
+      type: 'bad',
+      title: 'C1 · Nguy cơ va chạm cây',
+      desc: `AGL ${state.flight.aglHeight}m chỉ cao hơn cây ${state.flight.aglHeight - state.tree.h}m. Cần ≥ ${state.tree.h + 3}m để có buffer an toàn.`
+    });
+  }
+
+  // Speed vs blur
+  if (state.flight.speed > r.vMaxBlur) {
+    warnings.push({
+      type: 'bad',
+      title: 'Motion blur · Tốc độ quá nhanh',
+      desc: `Speed ${state.flight.speed} m/s > v_max ${r.vMaxBlur.toFixed(1)} m/s → ảnh nhòe do chuyển động. Giảm xuống ≤ ${(r.vMaxBlur * 0.8).toFixed(1)} m/s.`
+    });
+  }
+
+  // GSD
+  if (!r.meetsTarget) {
+    warnings.push({
+      type: 'warn',
+      title: 'GSD · Không đủ chi tiết',
+      desc: `Mục tiêu ${state.target.size}mm chỉ chiếm ${r.pxForTarget.toFixed(1)} px (cần ≥${state.target.minPx}). Hạ độ cao hoặc dùng sensor tele.`
+    });
+  }
+
+  // Battery
+  if (r.batteriesNeeded > state.battery.count) {
+    warnings.push({
+      type: 'bad',
+      title: 'E1 · Không đủ pin',
+      desc: `Mission cần ${r.batteriesNeeded} pin nhưng chỉ có ${state.battery.count}. Mua thêm pin hoặc chia mission.`
+    });
+  }
+
+  // Too many photos
+  if (r.N_total > 3000) {
+    warnings.push({
+      type: 'warn',
+      title: 'Dữ liệu · Quá nhiều ảnh',
+      desc: `${r.N_total} ảnh/mission → lưu trữ và xử lý AI sẽ tốn nhiều tài nguyên. Cân nhắc giảm overlap hoặc tăng độ cao.`
+    });
+  }
+
+  // Positive confirmations
+  if (warnings.length === 0 || warnings.every(w => w.type === 'good')) {
+    warnings.unshift({
+      type: 'good',
+      title: 'OK · Cấu hình tốt',
+      desc: `Tất cả điều kiện nằm trong ngưỡng an toàn. Mission sẵn sàng thực hiện.`
+    });
+  }
+
+  // Season info
+  if (phase.status === 'ok') {
+    warnings.push({
+      type: 'good',
+      title: `OK · Tháng ${state.env.month}`,
+      desc: `${phase.phase} — thời điểm tốt cho drone, cây ổn định, không có hoa/quả non nhạy cảm.`
+    });
+  }
+
+  return warnings;
+}
+
+function updateWarnings(r) {
+  const ws = detectEdgeCases(r);
+  $('warningGrid').innerHTML = ws.map(w => `
+    <div class="warning-card ${w.type}">
+      <div class="warning-card-title">${w.title}</div>
+      <div class="warning-card-desc">${w.desc}</div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// RECOMMENDATION
+// ============================================================
+function updateRecommendation(r) {
+  let statusText, mainText = '';
+  const phase = monthPhase(state.env.month);
+
+  if (phase.status === 'avoid') {
+    statusText = '🚫 KHÔNG NÊN BAY';
+    mainText = `Tháng ${state.env.month} là mùa ${phase.phase} của cây điều — drone có thể làm rụng hoa hoặc quả non, gây thiệt hại năng suất. Chuyển sang dùng camera PTZ trong giai đoạn này. Nếu bắt buộc phải bay, giữ độ cao ≥ 25m AGL và bay cực chậm.`;
+  } else if (!r.meetsTarget) {
+    statusText = '⚠ CHƯA ĐẠT MỤC TIÊU PHÁT HIỆN';
+    mainText = `Với độ cao ${state.flight.aglHeight}m AGL và sensor hiện tại, GSD = ${r.GSD.toFixed(2)} mm/px → mục tiêu ${state.target.size}mm chỉ ${r.pxForTarget.toFixed(1)} pixel. Cần hạ xuống ${Math.ceil(state.tree.h + maxAlt(state.target.size/state.target.minPx, r.fov, r.sensorW))}m AGL hoặc đổi sang sensor tele.`;
+  } else if (r.batteriesNeeded > state.battery.count) {
+    statusText = '⚠ KHÔNG ĐỦ PIN';
+    mainText = `Mission cần ${r.batteriesNeeded} pin, chỉ có ${state.battery.count}. Giải pháp: tăng độ cao để giảm số ảnh, hoặc giảm overlap, hoặc mua thêm pin.`;
+  } else if (r.propwashAtCanopy > 5) {
+    statusText = '⚠ PROPWASH QUÁ MẠNH';
+    mainText = `Propwash ${r.propwashAtCanopy.toFixed(1)} m/s tại tán → lá rung, ảnh nhòe. Nâng AGL lên ${Math.ceil(state.tree.h + 5)}m hoặc đổi chiến lược bay nghiêng thay vì nadir.`;
+  } else {
+    statusText = '✓ CẤU HÌNH TỐT';
+    mainText = `Với cấu hình hiện tại: GSD ${r.GSD.toFixed(2)} mm/px (${r.pxForTarget.toFixed(1)}px cho target), ${r.N_total} ảnh, ${r.T_flight_min.toFixed(0)} phút, ${r.batteriesNeeded} pin. Tất cả trong ngưỡng an toàn. Mission sẵn sàng triển khai.`;
+  }
+
+  $('recommendation').innerHTML = `
+    <h3>${statusText}</h3>
+    <p>${mainText}</p>
+    <div class="rec-grid">
+      <div class="rec-item"><b>Độ cao bay:</b> ${state.flight.aglHeight}m AGL (${r.h_above.toFixed(1)}m trên tán)</div>
+      <div class="rec-item"><b>Vùng phủ/ảnh:</b> ${r.W.toFixed(1)} × ${r.H.toFixed(1)}m</div>
+      <div class="rec-item"><b>GSD:</b> ${r.GSD.toFixed(2)} mm/pixel</div>
+      <div class="rec-item"><b>Tốc độ max (blur):</b> ${r.vMaxBlur.toFixed(1)} m/s</div>
+      <div class="rec-item"><b>Số ảnh:</b> ${r.N_total}</div>
+      <div class="rec-item"><b>Thời gian bay:</b> ${r.T_flight_min.toFixed(1)} phút</div>
+      <div class="rec-item"><b>Pin:</b> ${r.batteriesNeeded}/${state.battery.count}</div>
+      <div class="rec-item"><b>Propwash tán:</b> ${r.propwashAtCanopy.toFixed(1)} m/s</div>
+    </div>
+  `;
+}
+
+// ============================================================
+// PROPWASH CANVAS
+// ============================================================
+function drawPropwash(r) {
+  const canvas = $('propwashCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 400 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 400;
+
+  ctx.fillStyle = '#0a0e12';
+  ctx.fillRect(0, 0, W, H);
+
+  // Ground
+  const groundY = H - 40;
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  ctx.lineTo(W, groundY);
+  ctx.stroke();
+  ctx.fillStyle = '#1a2229';
+  ctx.fillRect(0, groundY, W, 40);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.05)';
+  ctx.lineWidth = 1;
+  for (let y = 0; y <= 20; y += 2) {
+    const cy = groundY - y * (groundY - 30) / 25;
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(W, cy);
+    ctx.stroke();
+    if (y % 5 === 0 && y > 0) {
+      ctx.fillStyle = 'rgba(138, 153, 164, 0.5)';
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${y}m`, 30, cy + 3);
+    }
+  }
+
+  // Drone position
+  const droneX = W / 2;
+  const droneY = groundY - state.flight.aglHeight * (groundY - 30) / 25;
+
+  // Draw propwash cone (gradient based on velocity)
+  const rotorD = DRONES[state.drone]?.rotorD || 0.27;
+  const pxPerM = (groundY - 30) / 25;
+
+  // Draw velocity field below drone - using 1D for visualization
+  for (let dh = 0; dh < state.flight.aglHeight; dh += 0.2) {
+    const v = propwashVel(dh, rotorD);
+    const y = droneY + dh * pxPerM;
+    if (y > groundY) break;
+
+    // Cone widens downward
+    const coneR = (rotorD/2 + dh * 0.15) * pxPerM;
+
+    let color;
+    if (v > 5) color = 'rgba(239, 71, 111, 0.25)';
+    else if (v > 3) color = 'rgba(245, 166, 35, 0.2)';
+    else color = 'rgba(126, 217, 87, 0.15)';
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(droneX, y, coneR, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw trees
+  const treeH_px = state.tree.h * pxPerM;
+  const treeCanopy_px = Math.min(treeH_px * 0.6, 80);
+  for (let tx = 100; tx < W - 100; tx += 130) {
+    if (Math.abs(tx - droneX) < 50) continue; // skip trees right under drone
+    // trunk
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(tx - 3, groundY - treeH_px + treeCanopy_px/2, 6, treeH_px - treeCanopy_px/2);
+    // canopy
+    ctx.fillStyle = 'rgba(90, 138, 58, 0.8)';
+    ctx.strokeStyle = 'rgba(90, 138, 58, 1)';
+    ctx.beginPath();
+    ctx.ellipse(tx, groundY - treeH_px + treeCanopy_px/2, 30, treeCanopy_px/2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Tree directly below drone (affected)
+  const treeX_below = droneX;
+  const v_at_canopy = propwashVel(state.flight.aglHeight - state.tree.h, rotorD);
+  const rustle = v_at_canopy > 3 ? Math.sin(Date.now() / 100) * (v_at_canopy / 5) : 0;
+
+  ctx.fillStyle = '#5d4037';
+  ctx.fillRect(treeX_below - 3, groundY - treeH_px + treeCanopy_px/2, 6, treeH_px - treeCanopy_px/2);
+  ctx.fillStyle = v_at_canopy > 5 ? 'rgba(239, 71, 111, 0.6)' : (v_at_canopy > 3 ? 'rgba(245, 166, 35, 0.7)' : 'rgba(90, 138, 58, 0.8)');
+  ctx.strokeStyle = v_at_canopy > 5 ? 'var(--bad)' : (v_at_canopy > 3 ? 'var(--warn)' : 'rgba(90, 138, 58, 1)');
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.ellipse(treeX_below + rustle, groundY - treeH_px + treeCanopy_px/2, 30, treeCanopy_px/2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw drone
+  ctx.fillStyle = '#10161c';
+  ctx.strokeStyle = '#4ecdc4';
+  ctx.lineWidth = 2;
+  ctx.fillRect(droneX - 12, droneY - 6, 24, 12);
+  ctx.strokeRect(droneX - 12, droneY - 6, 24, 12);
+  // Rotors
+  ctx.fillStyle = '#4ecdc4';
+  [-16, 16].forEach(dx => {
+    ctx.beginPath();
+    ctx.arc(droneX + dx, droneY, 4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Labels
+  ctx.fillStyle = '#4ecdc4';
+  ctx.font = 'bold 11px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`DRONE @ ${state.flight.aglHeight}m AGL`, droneX + 25, droneY);
+  ctx.fillText(`v_pw(tán) = ${v_at_canopy.toFixed(1)} m/s`, droneX + 25, droneY + 14);
+
+  // Info panel
+  ctx.fillStyle = 'rgba(16, 22, 28, 0.95)';
+  ctx.strokeStyle = 'rgba(78, 205, 196, 0.3)';
+  ctx.fillRect(W - 260, 12, 248, 100);
+  ctx.strokeRect(W - 260, 12, 248, 100);
+  ctx.fillStyle = '#4ecdc4';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillText('PROPWASH ANALYSIS', W - 252, 28);
+  ctx.fillStyle = '#e8ecef';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillText(`Drone rotor D = ${rotorD}m`, W - 252, 46);
+  ctx.fillText(`v_pw(0) @ rotor = 15.0 m/s`, W - 252, 60);
+  ctx.fillText(`v_pw @ tán (${state.flight.aglHeight - state.tree.h}m dưới):`, W - 252, 74);
+  ctx.fillStyle = v_at_canopy > 5 ? '#ef476f' : (v_at_canopy > 3 ? '#f5a623' : '#7ed957');
+  ctx.font = 'bold 12px "JetBrains Mono", monospace';
+  ctx.fillText(`${v_at_canopy.toFixed(2)} m/s`, W - 252, 90);
+  ctx.fillStyle = '#8a99a4';
+  ctx.font = '9px "JetBrains Mono", monospace';
+  ctx.fillText(v_at_canopy > 5 ? 'NGUY HIỂM — lá rung' : (v_at_canopy > 3 ? 'CẢNH BÁO' : 'AN TOÀN'), W - 252, 104);
+
+  // Update propwash info panel
+  const heights = [0, 3, 5, 8, 12, 16, 20];
+  $('propwashInfo').innerHTML = heights.map(h => {
+    const v = propwashVel(h, rotorD);
+    const status = v > 5 ? 'bad' : (v > 3 ? 'warn' : 'good');
+    const color = status === 'bad' ? 'var(--bad)' : (status === 'warn' ? 'var(--warn)' : 'var(--good)');
+    return `
+      <div class="propwash-card">
+        <div class="propwash-card-label">${h}m dưới rotor</div>
+        <div class="propwash-card-value" style="color: ${color}">${v.toFixed(1)} <span style="font-size: 12px; color: var(--text-dim)">m/s</span></div>
+        <div class="propwash-card-desc">${v > 5 ? 'Nguy hiểm — lá rụng/rung mạnh' : (v > 3 ? 'Cảnh báo — ảnh có thể nhòe' : 'An toàn cho bay gần')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// PATH CANVAS (top-down)
+// ============================================================
+function drawPath(r) {
+  const canvas = $('pathCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 500 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 500;
+
+  ctx.fillStyle = '#0a0e12';
+  ctx.fillRect(0, 0, W, H);
+
+  const pad = 50;
+  const scale = Math.min((W - pad*2) / state.field.l, (H - pad*2) / state.field.w);
+  const ox = (W - state.field.l * scale) / 2;
+  const oy = (H - state.field.w * scale) / 2;
+  const wx = x => ox + x * scale;
+  const wy = y => oy + y * scale;
+
+  // Field
+  ctx.fillStyle = '#10161c';
+  ctx.fillRect(wx(0), wy(0), state.field.l * scale, state.field.w * scale);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.05)';
+  for (let x = 0; x <= state.field.l; x += 10) {
+    ctx.beginPath(); ctx.moveTo(wx(x), wy(0)); ctx.lineTo(wx(x), wy(state.field.w)); ctx.stroke();
+  }
+  for (let y = 0; y <= state.field.w; y += 10) {
+    ctx.beginPath(); ctx.moveTo(wx(0), wy(y)); ctx.lineTo(wx(state.field.l), wy(y)); ctx.stroke();
+  }
+
+  // Trees
+  const canopyR = 2.5;
+  ctx.fillStyle = 'rgba(90, 138, 58, 0.35)';
+  ctx.strokeStyle = 'rgba(90, 138, 58, 0.6)';
+  for (let tx = state.spacing.col/2; tx < state.field.l; tx += state.spacing.col) {
+    for (let ty = state.spacing.row/2; ty < state.field.w; ty += state.spacing.row) {
+      ctx.beginPath();
+      ctx.arc(wx(tx), wy(ty), canopyR * scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // Field border
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(wx(0), wy(0), state.field.l * scale, state.field.w * scale);
+
+  // Flight path
+  const S_line = r.S_line;
+  const S_trig = r.S_trigger;
+
+  // Draw image footprints (semi-transparent)
+  ctx.fillStyle = 'rgba(78, 205, 196, 0.04)';
+  ctx.strokeStyle = 'rgba(78, 205, 196, 0.2)';
+  ctx.lineWidth = 0.5;
+  for (let li = 0; li < r.N_lines; li++) {
+    const y = (li + 0.5) * S_line;
+    if (y > state.field.w) break;
+    for (let pi = 0; pi < r.N_per_line; pi++) {
+      const x = (pi + 0.5) * S_trig;
+      if (x > state.field.l) break;
+      const fx = wx(x - r.W/2), fy = wy(y - r.H/2);
+      const fw = r.W * scale, fh = r.H * scale;
+      ctx.fillRect(fx, fy, fw, fh);
+      ctx.strokeRect(fx, fy, fw, fh);
+    }
+  }
+
+  // Flight path (zigzag)
+  ctx.strokeStyle = '#4ecdc4';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let li = 0; li < r.N_lines; li++) {
+    const y = (li + 0.5) * S_line;
+    if (y > state.field.w) break;
+    const xStart = li % 2 === 0 ? 0 : state.field.l;
+    const xEnd = li % 2 === 0 ? state.field.l : 0;
+    if (li === 0) ctx.moveTo(wx(xStart), wy(y));
+    else ctx.lineTo(wx(xStart), wy(y));
+    ctx.lineTo(wx(xEnd), wy(y));
+  }
+  ctx.stroke();
+
+  // Capture points (if hover mode)
+  if (state.flight.mode === 'hover') {
+    ctx.fillStyle = '#f5a623';
+    for (let li = 0; li < r.N_lines; li++) {
+      const y = (li + 0.5) * S_line;
+      if (y > state.field.w) break;
+      for (let pi = 0; pi < r.N_per_line; pi++) {
+        const x = li % 2 === 0 ? (pi + 0.5) * S_trig : state.field.l - (pi + 0.5) * S_trig;
+        if (x < 0 || x > state.field.l) continue;
+        ctx.beginPath();
+        ctx.arc(wx(x), wy(y), 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // Start/End markers
+  const startY = 0.5 * S_line;
+  ctx.fillStyle = '#7ed957';
+  ctx.beginPath(); ctx.arc(wx(0), wy(startY), 6, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#0a0e12';
+  ctx.font = 'bold 9px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('S', wx(0), wy(startY) + 3);
+
+  const lastLineY = (r.N_lines - 0.5) * S_line;
+  const endX = (r.N_lines - 1) % 2 === 0 ? state.field.l : 0;
+  if (lastLineY <= state.field.w) {
+    ctx.fillStyle = '#ef476f';
+    ctx.beginPath(); ctx.arc(wx(endX), wy(lastLineY), 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText('E', wx(endX), wy(lastLineY) + 3);
+  }
+
+  // Scale bar
+  ctx.strokeStyle = 'rgba(78, 205, 196, 0.8)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(wx(0), wy(state.field.w) + 25);
+  ctx.lineTo(wx(20), wy(state.field.w) + 25);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(138, 153, 164, 0.8)';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('20 m', wx(10), wy(state.field.w) + 40);
+
+  // Info
+  ctx.fillStyle = 'rgba(16, 22, 28, 0.95)';
+  ctx.strokeStyle = 'rgba(78, 205, 196, 0.3)';
+  ctx.fillRect(W - 220, 12, 208, 90);
+  ctx.strokeRect(W - 220, 12, 208, 90);
+  ctx.fillStyle = '#4ecdc4';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('FLIGHT PLAN', W - 212, 28);
+  ctx.fillStyle = '#e8ecef';
+  ctx.fillText(`Lines: ${r.N_lines}   S_line: ${r.S_line.toFixed(1)}m`, W - 212, 44);
+  ctx.fillText(`Per line: ${r.N_per_line}   S_trig: ${r.S_trigger.toFixed(1)}m`, W - 212, 58);
+  ctx.fillText(`Total: ${r.N_total} ảnh`, W - 212, 72);
+  ctx.fillText(`Distance: ${(r.D/1000).toFixed(2)} km`, W - 212, 86);
+}
+
+// ============================================================
+// SIDE VIEW
+// ============================================================
+function drawSide(r) {
+  const canvas = $('sideCanvas');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 450 * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 450;
+
+  ctx.fillStyle = '#0a0e12';
+  ctx.fillRect(0, 0, W, H);
+
+  // Y axis: 0 at bottom, up to 30m
+  const groundY = H - 40;
+  const topY = 30;
+  const pxPerM_y = (groundY - topY) / 30;
+
+  // X axis: 0 to 40m horizontally
+  const leftX = 50;
+  const rightX = W - 30;
+  const pxPerM_x = (rightX - leftX) / 40;
+
+  const sy = m => groundY - m * pxPerM_y;
+  const sx = m => leftX + m * pxPerM_x;
+
+  // Ground
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.3)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY); ctx.lineTo(W, groundY);
+  ctx.stroke();
+  ctx.fillStyle = '#1a2229';
+  ctx.fillRect(0, groundY, W, H - groundY);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(120, 180, 200, 0.05)';
+  ctx.lineWidth = 1;
+  for (let m = 0; m <= 30; m += 5) {
+    ctx.beginPath();
+    ctx.moveTo(0, sy(m)); ctx.lineTo(W, sy(m));
+    ctx.stroke();
+    if (m > 0) {
+      ctx.fillStyle = 'rgba(138, 153, 164, 0.5)';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${m}m`, leftX - 5, sy(m) + 3);
+    }
+  }
+  for (let m = 0; m <= 40; m += 5) {
+    ctx.beginPath();
+    ctx.moveTo(sx(m), topY); ctx.lineTo(sx(m), groundY);
+    ctx.stroke();
+    if (m > 0 && m < 40) {
+      ctx.fillStyle = 'rgba(138, 153, 164, 0.5)';
+      ctx.font = '9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${m}m`, sx(m), groundY + 13);
+    }
+  }
+
+  // Trees in a row
+  const canopyR = 2.5;
+  const treeHeight = state.tree.h;
+  const canopyHeight = treeHeight * 0.45;
+  for (let x = 5; x < 40; x += state.spacing.col) {
+    // Trunk
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(sx(x) - 2, sy(treeHeight - canopyHeight), 4, sy(0) - sy(treeHeight - canopyHeight));
+    // Canopy
+    ctx.fillStyle = 'rgba(90, 138, 58, 0.8)';
+    ctx.strokeStyle = 'rgba(90, 138, 58, 1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(sx(x), sy(treeHeight - canopyHeight/2), canopyR * pxPerM_x, canopyHeight * pxPerM_y / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Drone position
+  const droneX = sx(20);
+  const droneY = sy(state.flight.aglHeight);
+
+  // Propwash cone
+  const rotorD = DRONES[state.drone]?.rotorD || 0.27;
+  ctx.save();
+  for (let dh = 0; dh < state.flight.aglHeight; dh += 0.3) {
+    const v = propwashVel(dh, rotorD);
+    const y = droneY + dh * pxPerM_y;
+    if (y > groundY) break;
+    const coneR = (rotorD/2 + dh * 0.15) * pxPerM_x;
+
+    let color;
+    if (v > 5) color = 'rgba(239, 71, 111, 0.2)';
+    else if (v > 3) color = 'rgba(245, 166, 35, 0.15)';
+    else color = 'rgba(126, 217, 87, 0.1)';
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(droneX, y, coneR, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // FOV cone
+  const fov = r.fov;
+  const halfFov = deg2rad(fov / 2);
+  const rayLen = state.flight.aglHeight;
+
+  ctx.strokeStyle = 'rgba(78, 205, 196, 0.6)';
+  ctx.fillStyle = 'rgba(78, 205, 196, 0.08)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(droneX, droneY);
+  const leftRay_x = droneX - rayLen * Math.tan(halfFov) * pxPerM_x / pxPerM_y * pxPerM_y / pxPerM_x;
+  const rightRay_x = droneX + rayLen * Math.tan(halfFov) * pxPerM_x / pxPerM_y * pxPerM_y / pxPerM_x;
+  // Ray reaches ground
+  const halfCoverage = state.flight.aglHeight * Math.tan(halfFov);
+  ctx.lineTo(sx(20 - halfCoverage), sy(0));
+  ctx.lineTo(sx(20 + halfCoverage), sy(0));
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Drone
+  ctx.fillStyle = '#10161c';
+  ctx.strokeStyle = '#4ecdc4';
+  ctx.lineWidth = 2;
+  ctx.fillRect(droneX - 10, droneY - 5, 20, 10);
+  ctx.strokeRect(droneX - 10, droneY - 5, 20, 10);
+  // Rotors
+  ctx.fillStyle = '#4ecdc4';
+  [-13, 13].forEach(dx => {
+    ctx.beginPath();
+    ctx.arc(droneX + dx, droneY, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Labels
+  ctx.fillStyle = '#4ecdc4';
+  ctx.font = 'bold 11px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`AGL ${state.flight.aglHeight}m`, droneX + 20, droneY - 2);
+  ctx.fillStyle = 'rgba(78, 205, 196, 0.9)';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.fillText(`α=${fov.toFixed(1)}°  W=${r.W.toFixed(1)}m`, droneX + 20, droneY + 12);
+
+  // Coverage line on ground
+  ctx.strokeStyle = '#f5a623';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(sx(20 - halfCoverage), sy(0));
+  ctx.lineTo(sx(20 + halfCoverage), sy(0));
+  ctx.stroke();
+  ctx.fillStyle = '#f5a623';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`W = ${(2*halfCoverage).toFixed(1)}m`, sx(20), groundY - 6);
+}
+
+// ============================================================
+// GSD TABLE
+// ============================================================
+function updateGsdTable() {
+  const sensorW = +$('sensorW').value;
+  const fov = +$('fovH').value;
+  const altitudes = [5, 8, 10, 12, 15, 20, 25, 30, 40];
+
+  const rows = altitudes.map(alt => {
+    const h_above = Math.max(0.1, alt - state.tree.h);
+    const W = coverageWidth(h_above, fov);
+    const H = W * +$('sensorH').value / sensorW;
+    const g = gsd(h_above, fov, sensorW);
+    const px = state.target.size / g;
+
+    const rotorD = DRONES[state.drone]?.rotorD || 0.27;
+    const pw = propwashVel(h_above, rotorD);
+
+    let status = 'good', label = 'RÕ';
+    if (px < state.target.minPx * 0.75) { status = 'bad'; label = 'KHÔNG ĐỦ'; }
+    else if (px < state.target.minPx * 1.25) { status = 'warn'; label = 'BIÊN'; }
+
+    let pwStatus = 'good';
+    if (pw > 5) pwStatus = 'bad';
+    else if (pw > 3) pwStatus = 'warn';
+
+    return { alt, h_above, W, H, g, px, status, label, pw, pwStatus };
+  });
+
+  $('gsdTable').innerHTML = `
+    <thead>
+      <tr>
+        <th>AGL</th>
+        <th class="num">h_above tán</th>
+        <th class="num">W × H</th>
+        <th class="num">GSD</th>
+        <th class="num">Px cho ${state.target.size}mm</th>
+        <th>Chi tiết</th>
+        <th class="num">Propwash</th>
+        <th>An toàn</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(r => `
+        <tr>
+          <td>${r.alt} m</td>
+          <td class="num">${r.h_above.toFixed(1)} m</td>
+          <td class="num">${r.W.toFixed(1)} × ${r.H.toFixed(1)} m</td>
+          <td class="num">${r.g.toFixed(2)} mm/px</td>
+          <td class="num">${r.px.toFixed(1)} px</td>
+          <td><span class="chip ${r.status}">${r.label}</span></td>
+          <td class="num">${r.pw.toFixed(1)} m/s</td>
+          <td><span class="chip ${r.pwStatus}">${r.pwStatus === 'good' ? 'AN TOÀN' : (r.pwStatus === 'warn' ? 'CẢNH BÁO' : 'NGUY HIỂM')}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+}
+
+// ============================================================
+// SENSOR COMPARISON TABLE
+// ============================================================
+function updateSensorTable() {
+  const drone = DRONES[state.drone];
+  if (!drone) return;
+
+  const h_above = Math.max(0.1, state.flight.aglHeight - state.tree.h);
+  const rows = Object.entries(drone.sensors).map(([key, s]) => {
+    if (s.w === 0) return { ...s, key, skip: true };
+    const W = coverageWidth(h_above, s.fov);
+    const H = W * s.h / s.w;
+    const g = gsd(h_above, s.fov, s.w);
+    const px = state.target.size / g;
+
+    let status = 'good', label = 'RÕ';
+    if (px < state.target.minPx * 0.75) { status = 'bad'; label = 'KHÔNG ĐỦ'; }
+    else if (px < state.target.minPx * 1.25) { status = 'warn'; label = 'BIÊN'; }
+
+    return { ...s, key, W, H, g, px, status, label };
+  }).filter(s => !s.skip);
+
+  $('sensorTable').innerHTML = `
+    <thead>
+      <tr>
+        <th>Cảm biến</th>
+        <th class="num">Resolution</th>
+        <th class="num">FOV</th>
+        <th class="num">W × H @ ${state.flight.aglHeight}m AGL</th>
+        <th class="num">GSD</th>
+        <th class="num">Px cho ${state.target.size}mm</th>
+        <th>Chi tiết</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(s => `
+        <tr ${s.key === state.sensor ? 'style="background: rgba(78,205,196,0.06);"' : ''}>
+          <td><b>${s.name}</b>${s.key === state.sensor ? ' ←' : ''}</td>
+          <td class="num">${s.w} × ${s.h}</td>
+          <td class="num">${s.fov}°</td>
+          <td class="num">${s.W.toFixed(1)} × ${s.H.toFixed(1)} m</td>
+          <td class="num">${s.g.toFixed(2)} mm/px</td>
+          <td class="num">${s.px.toFixed(1)} px</td>
+          <td><span class="chip ${s.status}">${s.label}</span></td>
+        </tr>
+      `).join('')}
+    </tbody>
+  `;
+}
+
+// ============================================================
+// SEASON CALENDAR
+// ============================================================
+function drawSeasonCalendar() {
+  const monthNames = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
+  $('seasonCal').innerHTML = monthNames.map((n, i) => {
+    const m = i + 1;
+    const ph = monthPhase(m);
+    const isCurrent = m === state.env.month;
+    return `
+      <div class="month ${ph.status}" style="${isCurrent ? 'box-shadow: 0 0 0 2px var(--accent);' : ''}">
+        <div class="month-name">${n}</div>
+        <div class="month-status">${ph.emoji}</div>
+        <div class="month-phase">${ph.phase}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+function attachEvents() {
+  const inputs = ['fieldL','fieldW','rowSp','colSp','treeH',
+                  'altAGL','speed','overlapSide','overlapFwd',
+                  'sensorW','sensorH','fovH',
+                  'targetSize','minPx','month','hour','wind',
+                  'batteryTime','batteryCount'];
+  inputs.forEach(id => {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      if (id === 'altAGL') $('altVal').textContent = el.value;
+      if (id === 'speed') $('speedVal').textContent = el.value;
+      if (id === 'wind') $('windVal').textContent = el.value;
+      render();
+    });
+  });
+
+  $('dronePreset').addEventListener('change', e => {
+    const d = DRONES[e.target.value];
+    if (d) {
+      state.drone = e.target.value;
+      const s = d.sensors[state.sensor] || d.sensors.rgb_wide;
+      $('sensorW').value = s.w;
+      $('sensorH').value = s.h;
+      $('fovH').value = s.fov;
+      $('batteryTime').value = d.flightTime;
+      render();
+    }
+  });
+
+  document.querySelectorAll('.sensor-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sensor-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.sensor = btn.dataset.sensor;
+      const d = DRONES[state.drone];
+      if (d && d.sensors[state.sensor]) {
+        const s = d.sensors[state.sensor];
+        if (s.w > 0) {
+          $('sensorW').value = s.w;
+          $('sensorH').value = s.h;
+          $('fovH').value = s.fov;
+        }
+      }
+      render();
+    });
+  });
+
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.flight.mode = btn.dataset.mode;
+      render();
+    });
+  });
+
+  $('btnOptimize').addEventListener('click', () => {
+    // Find altitude that meets target and minimizes flight time
+    const fov = +$('fovH').value;
+    const sensorW = +$('sensorW').value;
+    const gsdMax = state.target.size / state.target.minPx;
+    const hOptimal = maxAlt(gsdMax, fov, sensorW);
+    const aglOptimal = Math.min(30, Math.max(state.tree.h + 3, hOptimal + state.tree.h));
+    $('altAGL').value = Math.round(aglOptimal * 2) / 2;
+    $('altVal').textContent = $('altAGL').value;
+    render();
+  });
+
+  $('btnExportJSON').addEventListener('click', () => {
+    const r = compute();
+    const data = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      drone: DRONES[state.drone].name,
+      sensor: state.sensor,
+      field: state.field,
+      spacing: state.spacing,
+      tree: state.tree,
+      flight: state.flight,
+      target: state.target,
+      env: state.env,
+      battery: state.battery,
+      computed: r
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cashew-drone-mission-${Date.now()}.json`;
+    a.click();
+  });
+
+  $('btnExportPNG').addEventListener('click', () => {
+    const url = $('pathCanvas').toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `drone-flight-path-${Date.now()}.png`;
+    a.click();
+  });
+
+  $('btnPrint').addEventListener('click', () => window.print());
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  readInputs();
+  const r = compute();
+  updateKPIs(r);
+  updateRecommendation(r);
+  updateWarnings(r);
+  drawPropwash(r);
+  drawPath(r);
+  drawSide(r);
+  drawSeasonCalendar();
+  updateGsdTable();
+  updateSensorTable();
+}
+
+window.addEventListener('load', () => {
+  attachEvents();
+  render();
+});
+window.addEventListener('resize', () => {
+  const r = compute();
+  drawPropwash(r);
+  drawPath(r);
+  drawSide(r);
+});
+</script>
+
+</body>
+</html>
